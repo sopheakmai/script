@@ -211,7 +211,9 @@ async function getAllFiles(dir: string, exts = targetExtensions): Promise<string
       }
     }
   } catch (error) {
-    console.error(`Error reading directory ${dir}: ${error.message}`);
+    // Handle the unknown error type safely
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`Error reading directory ${dir}: ${errorMessage}`);
   }
   return results;
 }
@@ -247,7 +249,8 @@ allKeysArr.forEach((key: string) => {
   result[key] = toHumanReadable(key);
   validCount++;
 });
-const outputPath = `${new URL(import.meta.url).pathname.replace(/\/[^/]+$/, "")}/locales-keys.ts`;
+// Use the current working directory for output path instead of import.meta.url
+const outputPath = `${Deno.cwd()}/scripts/locales-keys.ts`;
 
 // ...existing code...
 

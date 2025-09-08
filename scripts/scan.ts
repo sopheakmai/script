@@ -57,8 +57,12 @@ const ignorePatterns: string[] = [
  *
  * Features:
  * - Scans for translation keys in t() calls across the project.
- * - Supports strict format: t('word') or t("word") (no spaces in key).
- * - Ignores invalid formats (e.g. t('word with spaces')).
+ * - Supports strict format: t('word') or t("word") with the following validation rules:
+ *   - No spaces in keys
+ *   - Keys must start with lowercase letters
+ *   - No special characters (parentheses, brackets, symbols, etc.)
+ *   - No file paths or .vue extensions
+ * - Ignores invalid formats and logs them with specific reasons.
  * - Detects t('key', { ... }) or t("key", { ... }) and logs for manual review (shows file and line number).
  * - Outputs result grouped by first letter (A-Z), with comment headers for each letter, in locales-keys.ts.
  * - Always outputs all letters A-Z, even if no keys exist for a letter.
@@ -231,21 +235,43 @@ let errorCount = 0;
 let validCount = 0;
 const allKeysArr = Array.from(allKeys).sort();
 allKeysArr.forEach((key: string) => {
+  let isInvalid = false;
+  let reason = "";
+
+  // Check for spaces
   if (key.includes(" ")) {
+    isInvalid = true;
+    reason = "contains spaces";
+  } 
+  // Check for capitalized first letter
+  else if (/^[A-Z]/.test(key)) {
+    isInvalid = true;
+    reason = "starts with uppercase letter";
+  }
+  // Check for special characters like parentheses and symbols
+  else if (/[(){}[\]<>!@#$%^&*=+]/.test(key)) {
+    isInvalid = true;
+    reason = "contains special characters";
+  }
+  // Check for path-like strings
+  else if (key.startsWith("~/") || key.endsWith(".vue")) {
+    isInvalid = true;
+    reason = "looks like a file path";
+  }
+
+  if (isInvalid) {
     const filePaths = files.filter(file => extractTKeys(file).includes(key));
     filePaths.forEach((filePath) => {
       console.log(
         `${bold(red("[INVALID]"))
         } ${bold(`t("${key}")`)
-        } found in ${blue(filePath)}`,
+        } found in ${blue(filePath)} - ${reason}`,
       );
     });
     errorCount++;
     return;
   }
-  if (key.startsWith("~/") || key.endsWith(".vue")) {
-    return;
-  }
+  
   result[key] = toHumanReadable(key);
   validCount++;
 });
@@ -284,4 +310,19 @@ console.log(`${green("Total keys scanned:")} ${bold(allKeysArr.length.toString()
 console.log(`${red("Invalid keys:")} ${bold(errorCount.toString())}`);
 console.log(`${green("Valid keys saved:")} ${bold(validCount.toString())}`);
 console.log(`${green("Output file:")} ${blue(outputPath)}`);
+
+// Show examples of correct format
+if (errorCount > 0) {
+  console.log(bold(green("\n─────────────── Correct Format Guide ───────────────")));
+  console.log(`${bold("Invalid:")} ${red("Equal(==)")}    ${bold("Valid:")} ${green("equal")}`);
+  console.log(`${bold("Invalid:")} ${red("About Business")}    ${bold("Valid:")} ${green("aboutBusiness")}`);
+  console.log(`${bold("Invalid:")} ${red("T")}    ${bold("Valid:")} ${green("t")}`);
+  console.log(`${bold("Invalid:")} ${red("Search....")}    ${bold("Valid:")} ${green("search")}`);
+  console.log(`${bold("Invalid:")} ${red("N/A")}    ${bold("Valid:")} ${green("na")}`);
+  console.log(bold(green("\nKey Format Rules:")));
+  console.log(`${green("-")} Must start with lowercase letter`);
+  console.log(`${green("-")} No spaces (use camelCase or dot notation)`);
+  console.log(`${green("-")} No special characters like (), {}, [], <>, !, @, #, $, %, ^, &, *, =, +`);
+  console.log(`${green("-")} Examples of valid keys: ${blue("user.profile")}, ${blue("accountSettings")}, ${blue("invoiceDetails")}`);
+}
 console.log(bold(green("─────────────────────────────────────────────\n")));

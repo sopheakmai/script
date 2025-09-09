@@ -135,40 +135,33 @@ const TRANSLATION_KEY_FORMATS: RegExp[] = [
   /t\(\s*"([^"]+)"\s*\)/g, // t("key")
 ];
 
-function extractTKeys(file: string): string[] {
+function extractTKeys(file: string): { key: string; lineNumber: number }[] {
   const content = Deno.readTextFileSync(file);
-  const keys: string[] = [];
+  const lines = content.split('\n');
+  const results: { key: string; lineNumber: number }[] = [];
+  
   for (const regex of TRANSLATION_KEY_FORMATS) {
-    let match: RegExpExecArray | null;
-    while ((match = regex.exec(content)) !== null) {
-      keys.push(match[1]);
+    // For each line, search for the regex
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      let match: RegExpExecArray | null;
+      const lineRegex = new RegExp(regex.source, regex.flags);
+      
+      while ((match = lineRegex.exec(line)) !== null) {
+        results.push({
+          key: match[1],
+          lineNumber: i + 1, // Line numbers are 1-based
+        });
+      }
     }
   }
+  
   // Ignore all other usages, including t('key', {...})
-  return keys;
-// ...existing code...
-// ...existing code...
-
-// Adjust file types to scan here
-// ...existing code...
-
-async function getAllFiles(dir: string, exts = targetExtensions): Promise<string[]> {
-  let results: string[] = [];
-  for await (const entry of Deno.readDir(dir)) {
-    const filePath = `${dir}/${entry.name}`;
-    const relPath = filePath.replace(`${Deno.cwd()}/`, "");
-    if (shouldIgnore(relPath)) continue;
-    if (entry.isDirectory) {
-      results = results.concat(await getAllFiles(filePath, exts));
-    } else if (exts.includes(filePath.slice(filePath.lastIndexOf(".")))) {
-      results.push(filePath);
-    }
-  }
   return results;
 }
 
+// Adjust file types to scan here
 // ...existing code...
-}
 
 function toHumanReadable(key: string): string {
   // Replace . and - with space, then split camelCase
@@ -223,17 +216,22 @@ async function getAllFiles(dir: string, exts = targetExtensions): Promise<string
 }
 
 const files = await getAllFiles(scanDir);
-const allKeys = new Set<string>();
+const allKeyData = new Map<string, { filePath: string; lineNumber: number }[]>();
+
 for (const file of files) {
-  for (const key of extractTKeys(file)) {
-    allKeys.add(key);
+  const extractedData = extractTKeys(file);
+  for (const { key, lineNumber } of extractedData) {
+    if (!allKeyData.has(key)) {
+      allKeyData.set(key, []);
+    }
+    allKeyData.get(key)!.push({ filePath: file, lineNumber });
   }
 }
 
 const result: Record<string, string> = {};
 let errorCount = 0;
 let validCount = 0;
-const allKeysArr = Array.from(allKeys).sort();
+const allKeysArr = Array.from(allKeyData.keys()).sort();
 allKeysArr.forEach((key: string) => {
   let isInvalid = false;
   let reason = "";
@@ -260,12 +258,12 @@ allKeysArr.forEach((key: string) => {
   }
 
   if (isInvalid) {
-    const filePaths = files.filter(file => extractTKeys(file).includes(key));
-    filePaths.forEach((filePath) => {
+    const occurrences = allKeyData.get(key) || [];
+    occurrences.forEach(({ filePath, lineNumber }) => {
       console.log(
         `${bold(red("[INVALID]"))
         } ${bold(`t("${key}")`)
-        } found in ${blue(filePath)} - ${reason}`,
+        } found in ${blue(filePath)} on line ${bold(lineNumber.toString())} - ${reason}`,
       );
     });
     errorCount++;

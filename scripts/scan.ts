@@ -57,7 +57,13 @@ const ignorePatterns: string[] = [
  *
  * Features:
  * - Scans for translation keys in t() calls across the project.
- * - Supports strict format: t('word') or t("word") with the following validation rules:
+ * - Supports various translation key formats:
+ *   1. Single-word keys (e.g., 'page', 'submit', 'cancel')
+ *   2. Dot notation (e.g., 'user.name', 'common.button.submit')
+ *   3. camelCase (e.g., 'accountSettings', 'userProfile')
+ *   4. kebab-case (e.g., 'order-details', 'user-profile')
+ *   5. snake_case (e.g., 'invoice_id', 'user_profile')
+ * - Applies validation rules to all keys:
  *   - No spaces in keys
  *   - Keys must start with lowercase letters
  *   - No special characters (parentheses, brackets, symbols, etc.)
@@ -69,14 +75,9 @@ const ignorePatterns: string[] = [
  * - Human-readable value for each key (e.g. "account.center.activity-user" → "Account Center Activity User").
  * - Respects .gitignore and custom ignore patterns.
  * - Configurable file extensions and ignore patterns.
- * - Option to override or merge with existing locales-keys.ts:
- *     - Set const override: boolean = true to overwrite.
- *     - Set override = false to merge new keys with existing ones.
  *
  * Usage:
- *   pnpm esno scripts/find-locales.ts
- *   # or to scan a specific directory:
- *   pnpm esno scripts/find-locales.ts ./src/pages
+ *   ./scan [scanDir] [outputDir]
  *
  * Output:
  *   locales-keys.ts
@@ -90,7 +91,7 @@ const ignorePatterns: string[] = [
  *
  * Manual Review:
  *   - If t('key', { ... }) or t("key", { ... }) is found, logs:
- *     [MANUAL REVIEW] t("can.do", {...}) found in src/pages/foo.vue at line 42
+ *     [MANUAL REVIEW] t("can.do", {...}) found in src/pages/foo.vue on line 42
  *   - These keys are NOT added to the result and must be handled manually.
  */
 
@@ -116,7 +117,7 @@ try {
 } catch (err) {
   console.error(red(`Error: Cannot access scan directory: ${scanDir}`));
   console.error(err instanceof Error ? err.message : String(err));
-  console.log(yellow(`Usage: deno run --allow-read --allow-write scripts/scan.ts [scanDir] [outputDir]`));
+  console.log(yellow(`Usage: ./scan [scanDir] [outputDir]`));
   Deno.exit(1);
 }
 
@@ -151,11 +152,20 @@ const TRANSLATION_KEY_FORMATS: RegExp[] = [
   /t\(\s*"([^"]+)"\s*\)/g, // t("key")
 ];
 
+// Patterns for translation calls that need manual review
+const MANUAL_REVIEW_FORMATS: RegExp[] = [
+  /t\(\s*'([^']+)'\s*,\s*\{[^}]*\}\s*\)/g, // t('key', {...})
+  /t\(\s*"([^"]+)"\s*,\s*\{[^}]*\}\s*\)/g, // t("key", {...})
+  /\$t\(\s*'([^']+)'\s*,\s*\{[^}]*\}\s*\)/g, // $t('key', {...})
+  /\$t\(\s*"([^"]+)"\s*,\s*\{[^}]*\}\s*\)/g, // $t("key", {...})
+];
+
 function extractTKeys(file: string): { key: string; lineNumber: number }[] {
   const content = Deno.readTextFileSync(file);
   const lines = content.split('\n');
   const results: { key: string; lineNumber: number }[] = [];
   
+  // Check for normal translation keys
   for (const regex of TRANSLATION_KEY_FORMATS) {
     // For each line, search for the regex
     for (let i = 0; i < lines.length; i++) {
@@ -172,17 +182,43 @@ function extractTKeys(file: string): { key: string; lineNumber: number }[] {
     }
   }
   
-  // Ignore all other usages, including t('key', {...})
   return results;
+}
+
+// Separate function to check for manual review cases
+function checkForManualReview(file: string): number {
+  const content = Deno.readTextFileSync(file);
+  const lines = content.split('\n');
+  let count = 0;
+  
+  // Check for translation keys that need manual review
+  for (const regex of MANUAL_REVIEW_FORMATS) {
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      let match: RegExpExecArray | null;
+      const lineRegex = new RegExp(regex.source, regex.flags);
+      
+      while ((match = lineRegex.exec(line)) !== null) {
+        // Log keys that need manual review
+        console.log(
+          `${bold(yellow("[MANUAL REVIEW]"))} ${bold(`t("${match[1]}", {...})`)
+          } found in ${blue(file)} on line ${bold((i + 1).toString())}`
+        );
+        count++;
+      }
+    }
+  }
+  
+  return count;
 }
 
 // Adjust file types to scan here
 // ...existing code...
 
 function toHumanReadable(key: string): string {
-  // Replace . and - with space, then split camelCase
+  // Replace ., - and _ with space, then split camelCase
   return key
-    .replace(/[.-]/g, " ")
+    .replace(/[.\-_]/g, " ")
     .split(" ")
     .map(word =>
       word
@@ -233,6 +269,7 @@ async function getAllFiles(dir: string, exts = targetExtensions): Promise<string
 
 const files = await getAllFiles(scanDir);
 const allKeyData = new Map<string, { filePath: string; lineNumber: number }[]>();
+let manualReviewCount = 0;
 
 for (const file of files) {
   const extractedData = extractTKeys(file);
@@ -242,6 +279,8 @@ for (const file of files) {
     }
     allKeyData.get(key)!.push({ filePath: file, lineNumber });
   }
+  // Check for cases needing manual review
+  manualReviewCount += checkForManualReview(file);
 }
 
 const result: Record<string, string> = {};
@@ -263,6 +302,7 @@ allKeysArr.forEach((key: string) => {
     reason = "starts with uppercase letter";
   }
   // Check for special characters like parentheses and symbols
+  // Allowing underscores (_), dots (.), and hyphens (-) as they are common in translation keys
   else if (/[(){}[\]<>!@#$%^&*=+]/.test(key)) {
     isInvalid = true;
     reason = "contains special characters";
@@ -290,7 +330,7 @@ allKeysArr.forEach((key: string) => {
   validCount++;
 });
 // Get output path from args or use default
-const outputDir = Deno.args[1]?.endsWith('/') ? Deno.args[1] : (Deno.args[1] && `${Deno.args[1]}/`) || `${Deno.cwd()}/scripts/`;
+const outputDir = Deno.args[1]?.endsWith('/') ? Deno.args[1] : (Deno.args[1] && `${Deno.args[1]}/`) || `${Deno.cwd()}/`;
 const outputPath = `${outputDir}locales-keys.ts`;
 
 // Ensure output directory exists
@@ -340,6 +380,7 @@ try {
 console.log(bold(green("\n─────────────── Scan Summary ───────────────")));
 console.log(`${green("Total keys scanned:")} ${bold(allKeysArr.length.toString())}`);
 console.log(`${red("Invalid keys:")} ${bold(errorCount.toString())}`);
+console.log(`${yellow("Manual review needed:")} ${bold(manualReviewCount.toString())}`);
 console.log(`${green("Valid keys saved:")} ${bold(validCount.toString())}`);
 console.log(`${green("Output file:")} ${blue(outputPath)}`);
 
@@ -353,8 +394,9 @@ if (errorCount > 0) {
   console.log(`${bold("Invalid:")} ${red("N/A")}    ${bold("Valid:")} ${green("na")}`);
   console.log(bold(green("\nKey Format Rules:")));
   console.log(`${green("-")} Must start with lowercase letter`);
-  console.log(`${green("-")} No spaces (use camelCase or dot notation)`);
+  console.log(`${green("-")} No spaces (use camelCase, dot notation, or underscores)`);
   console.log(`${green("-")} No special characters like (), {}, [], <>, !, @, #, $, %, ^, &, *, =, +`);
-  console.log(`${green("-")} Examples of valid keys: ${blue("user.profile")}, ${blue("accountSettings")}, ${blue("invoiceDetails")}`);
+  console.log(`${green("-")} Allowed separators: dots (.), hyphens (-), and underscores (_)`);
+  console.log(`${green("-")} Examples of valid keys: ${blue("user.profile")}, ${blue("account_settings")}, ${blue("invoice-details")}`);
 }
 console.log(bold(green("─────────────────────────────────────────────\n")));

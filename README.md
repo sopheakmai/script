@@ -15,8 +15,14 @@ A tool for scanning Vue/TypeScript projects to find translation keys and validat
 ### Using Deno Tasks
 
 ```bash
+# Run the scanner on the current directory
+deno task scan
+
 # Run the scanner on a specific directory
 deno task scan /path/to/scan
+
+# Run the scanner on a specific directory with custom output directory
+deno task scan /path/to/scan /path/to/output/dir/
 
 # Build the scanner executable
 deno task build
@@ -25,8 +31,14 @@ deno task build
 ### Using the Executable (after building)
 
 ```bash
+# Run the scanner on the current directory
+./scan
+
 # Run the scanner on a specific directory
 ./scan /path/to/scan
+
+# Run the scanner on a specific directory with custom output directory
+./scan /path/to/scan /path/to/output/dir/
 ```
 
 ## Key Format Rules

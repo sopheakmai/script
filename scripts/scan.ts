@@ -95,13 +95,29 @@ const ignorePatterns: string[] = [
  */
 
 // Log Features section to console
-import { bold, green, blue, red } from "https://deno.land/std@0.203.0/fmt/colors.ts";
+import { bold, green, blue, red, yellow } from "https://deno.land/std@0.203.0/fmt/colors.ts";
 
+// Parse command line arguments
 let scanDir = Deno.args[0];
 if (!scanDir) {
   scanDir = Deno.cwd(); // scan the whole project by default
+  console.log(`${yellow("No scan directory specified, using current directory:")} ${blue(scanDir)}`);
 } else {
   scanDir = new URL(scanDir, `file://${Deno.cwd()}/`).pathname;
+}
+
+// Check if scan directory exists
+try {
+  const scanDirInfo = await Deno.stat(scanDir);
+  if (!scanDirInfo.isDirectory) {
+    console.error(red(`Error: Scan path is not a directory: ${scanDir}`));
+    Deno.exit(1);
+  }
+} catch (err) {
+  console.error(red(`Error: Cannot access scan directory: ${scanDir}`));
+  console.error(err instanceof Error ? err.message : String(err));
+  console.log(yellow(`Usage: deno run --allow-read --allow-write scripts/scan.ts [scanDir] [outputDir]`));
+  Deno.exit(1);
 }
 
 console.log(bold(green("\n──────────── Translation Key Scanner ────────────")));
@@ -273,8 +289,20 @@ allKeysArr.forEach((key: string) => {
   result[key] = toHumanReadable(key);
   validCount++;
 });
-// Use the current working directory for output path instead of import.meta.url
-const outputPath = `${Deno.cwd()}/scripts/locales-keys.ts`;
+// Get output path from args or use default
+const outputDir = Deno.args[1]?.endsWith('/') ? Deno.args[1] : (Deno.args[1] && `${Deno.args[1]}/`) || `${Deno.cwd()}/scripts/`;
+const outputPath = `${outputDir}locales-keys.ts`;
+
+// Ensure output directory exists
+try {
+  await Deno.mkdir(outputDir, { recursive: true });
+  console.log(`Ensuring output directory exists: ${outputDir}`);
+} catch (err) {
+  if (!(err instanceof Deno.errors.AlreadyExists)) {
+    console.error(`Error creating output directory: ${err instanceof Error ? err.message : String(err)}`);
+    throw err;
+  }
+}
 
 // ...existing code...
 
@@ -302,7 +330,13 @@ allLetters.forEach((letter) => {
 });
 output += "}\n";
 
-await Deno.writeTextFile(outputPath, output);
+try {
+  await Deno.writeTextFile(outputPath, output);
+} catch (err) {
+  console.error(`Error writing to ${outputPath}: ${err instanceof Error ? err.message : String(err)}`);
+  console.log(`Try running with output directory specified: deno run --allow-read --allow-write scripts/scan.ts [scanDir] [outputDir]`);
+  throw err;
+}
 console.log(bold(green("\n─────────────── Scan Summary ───────────────")));
 console.log(`${green("Total keys scanned:")} ${bold(allKeysArr.length.toString())}`);
 console.log(`${red("Invalid keys:")} ${bold(errorCount.toString())}`);

@@ -2,7 +2,8 @@
   "tasks": {
     "dev": "deno run --allow-read --allow-write index.ts",
     "scan": "deno run --allow-read --allow-write scripts/scan.ts",
-    "build": "deno compile --allow-read --allow-write -o scan scripts/scan.ts"
+    "build": "deno compile --allow-read --allow-write -o app index.ts",
+    "build:scan": "deno compile --allow-read --allow-write -o scan scripts/scan.ts"
   },
   "imports": {
     "@std/assert": "jsr:@std/assert@1",

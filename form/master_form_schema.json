@@ -1,0 +1,263 @@
+{
+  "form": {
+    "id": "userManagementForm",
+    "title": "User Management",
+    "layout": {
+      "columns": 12
+    },
+    "modes": [
+      "create",
+      "update",
+      "duplicate"
+    ],
+    "tabs": [
+      {
+        "id": "general",
+        "label": "General Info",
+        "sections": [
+          {
+            "id": "basicInfo",
+            "label": "Basic Information",
+            "fields": [
+              {
+                "id": "username",
+                "type": "text",
+                "label": "Username",
+                "required": true,
+                "layout": {
+                  "colSpan": 6
+                },
+                "rules": [
+                  "noSpaces"
+                ],
+                "errorKey": "username_error"
+              },
+              {
+                "id": "email",
+                "type": "text",
+                "label": "Email",
+                "required": true,
+                "layout": {
+                  "colSpan": 6
+                },
+                "rules": [
+                  "email"
+                ],
+                "errorKey": "email_error"
+              },
+              {
+                "id": "password",
+                "type": "password",
+                "label": "Password",
+                "required": true,
+                "layout": {
+                  "colSpan": 6
+                },
+                "visibleWhen": {
+                  "mode": "create"
+                },
+                "errorKey": "password_error"
+              },
+              {
+                "id": "status",
+                "type": "select",
+                "label": "Status",
+                "options": [
+                  {
+                    "label": "Active",
+                    "value": "active"
+                  },
+                  {
+                    "label": "Inactive",
+                    "value": "inactive"
+                  }
+                ],
+                "default": "active",
+                "layout": {
+                  "colSpan": 6
+                },
+                "errorKey": "status_error"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "details",
+        "label": "Details",
+        "sections": [
+          {
+            "id": "profile",
+            "label": "Profile Information",
+            "fields": [
+              {
+                "id": "birthDate",
+                "type": "date",
+                "label": "Birth Date",
+                "layout": {
+                  "colSpan": 6
+                },
+                "errorKey": "birthdate_error"
+              },
+              {
+                "id": "gender",
+                "type": "radio",
+                "label": "Gender",
+                "options": [
+                  {
+                    "label": "Male",
+                    "value": "M"
+                  },
+                  {
+                    "label": "Female",
+                    "value": "F"
+                  }
+                ],
+                "layout": {
+                  "colSpan": 6
+                },
+                "errorKey": "gender_error"
+              },
+              {
+                "id": "bio",
+                "type": "textarea",
+                "label": "Biography",
+                "layout": {
+                  "colSpan": 12
+                },
+                "maxLength": 300,
+                "errorKey": "bio_error"
+              }
+            ]
+          },
+          {
+            "id": "permissions",
+            "label": "Permissions",
+            "fields": [
+              {
+                "id": "roles",
+                "type": "multi-select",
+                "label": "Roles",
+                "dataSource": {
+                  "type": "api",
+                  "url": "/api/roles",
+                  "labelKey": "name",
+                  "valueKey": "id"
+                },
+                "layout": {
+                  "colSpan": 12
+                },
+                "errorKey": "roles_error"
+              },
+              {
+                "id": "permissionsTable",
+                "type": "table-select",
+                "label": "Assign Permissions",
+                "dataSource": {
+                  "type": "api",
+                  "url": "/api/permissions",
+                  "paginated": true
+                },
+                "layout": {
+                  "colSpan": 12
+                },
+                "errorKey": "permissions_error"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "advanced",
+        "label": "Advanced",
+        "sections": [
+          {
+            "id": "logic",
+            "label": "Logic & Rules",
+            "fields": [
+              {
+                "id": "quota",
+                "type": "number",
+                "label": "Quota (MB)",
+                "layout": {
+                  "colSpan": 4
+                },
+                "errorKey": "quota_error"
+              },
+              {
+                "id": "usedQuota",
+                "type": "number",
+                "label": "Used Quota (MB)",
+                "layout": {
+                  "colSpan": 4
+                },
+                "disabled": true,
+                "calculation": {
+                  "type": "frontend",
+                  "formula": "quota * 0.5"
+                }
+              },
+              {
+                "id": "remainingQuota",
+                "type": "number",
+                "label": "Remaining Quota (MB)",
+                "layout": {
+                  "colSpan": 4
+                },
+                "disabled": true,
+                "calculation": {
+                  "type": "backend",
+                  "api": "/api/calc/remainingQuota",
+                  "dependsOn": [
+                    "quota",
+                    "usedQuota"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "uploads",
+            "label": "File Uploads",
+            "fields": [
+              {
+                "id": "profilePicture",
+                "type": "file",
+                "label": "Profile Picture",
+                "accept": [
+                  "image/png",
+                  "image/jpeg"
+                ],
+                "maxSizeMB": 5,
+                "layout": {
+                  "colSpan": 6
+                },
+                "errorKey": "profilePicture_error"
+              },
+              {
+                "id": "documents",
+                "type": "file-multi",
+                "label": "Documents",
+                "accept": [
+                  "application/pdf"
+                ],
+                "layout": {
+                  "colSpan": 6
+                },
+                "errorKey": "documents_error"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "actions": {
+      "onSubmit": {
+        "api": "/api/users/save",
+        "method": "POST",
+        "preTransform": "stripEmptyFields",
+        "postTransform": "normalizeResponse"
+      }
+    }
+  }
+}

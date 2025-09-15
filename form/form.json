@@ -1,0 +1,36 @@
+{
+  "form": {
+     "layout": { 
+      "type": "grid",
+      "columns": 12, 
+      "style": { "gap": "16px" } 
+    },
+    "tab": [
+      {
+        "title": "General Title",
+        "fields": [
+          {
+            "file": {},
+            "hot_field": [],
+            "money_field": {},
+            "remote_url_create": "",
+            "path_json_create": "",
+            "hide_on_create": false,
+            "can_create": false,
+            "remote_url": "",
+            "choices": [],
+            "visible": true,
+            "default": null,
+            "disabled": false,
+            "label": "name",
+            "value": "name",
+            "rule": ["required", "between|1,100"],
+            "width": 6,
+            "type": "text",
+            "error": ""
+          }
+        ]
+      }
+    ]
+  }
+}

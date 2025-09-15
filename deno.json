@@ -1,6 +1,6 @@
 {
   "tasks": {
-    "dev": "deno run --allow-read --allow-write scripts/scan.ts",
+    "dev": "deno run --allow-read --allow-write index.ts",
     "scan": "deno run --allow-read --allow-write scripts/scan.ts",
     "build": "deno compile --allow-read --allow-write -o scan scripts/scan.ts"
   },
